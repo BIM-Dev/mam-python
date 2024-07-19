@@ -141,13 +141,11 @@ class updateMasterDate(views.APIView):
         file_dir = file
         master_data_sheet_name = '主数据模板'
         line_colors_sheet_name = '线路颜色标识模板'
+        station_mapping_sheet_name = 'L&E站点匹配模板'
         env_info_code = request.data['environment']
         user = request.data['email']
-
         generator = Mam_e_master_data_generator(file_dir, master_data_sheet_name, line_colors_sheet_name,
-                                                connection_parameters,
-                                                env_info_code,
-                                                user)
+                                                station_mapping_sheet_name, connection_parameters, env_info_code, user)
         # export_file_dir = r'C:\Users\xiaoyu.yan\OneDrive - JCDECAUX\Desktop\Projects\MAM\MAM Enhancement\主数据\NEW_exported.xlsx'
         # generator.export_excel_file(export_file_dir)
         generator.upload_data_to_db(connection_parameters=connection_parameters, schema=schema,

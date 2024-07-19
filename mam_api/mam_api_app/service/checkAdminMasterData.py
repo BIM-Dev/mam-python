@@ -5,8 +5,8 @@ import psycopg2
 
 class checkAdminMasterData:
     def __init__(self, file, env_info_code):
-        self.env_info_code = env_info_code
         self.file = file
+        self.env_info_code = env_info_code
         # 检查是否三个模板都存在
 
         # self.df_master_data = pd.read_excel(file, sheet_name="主数据模板")
@@ -27,7 +27,7 @@ class checkAdminMasterData:
         else:
             status = False
             missing_fields = set(fields_list) - set(df_columns)
-            message.append({"step": "检查字段是否确实",
+            message.append({"step": "检查字段是否存在",
                             "reason":  "以下必需字段缺失，请检查文件是否包含这些字段：" + ", ".join(missing_fields) +  '' + '\n'})
 
         return status, message
@@ -37,7 +37,6 @@ class checkAdminMasterData:
         message = []
         try:
             df_master_data = pd.read_excel(file, sheet_name="主数据模板")
-            # df_master_data['站点编号'] = df_master_data['线路中文名称'] + df_master_data['站点中文名称']
         except:
             status = False
             message.append({"step": "检查是否三个模板都存在",
@@ -56,23 +55,19 @@ class checkAdminMasterData:
                             "reason": "缺失数据表：L&E站点匹配模板；"})
         if status == True:
             self.df_master_data = pd.read_excel(file, sheet_name="主数据模板")
+            self.df_master_data['站点编号'] = self.df_master_data['线路中文名称'] + self.df_master_data['站点中文名称']
             self.df_line_color = pd.read_excel(file, sheet_name="线路颜色标识模板")
             self.df_station_mapping = pd.read_excel(file, sheet_name="L&E站点匹配模板")
-            # status, message = self._check_no_null_value_in_cloumns(self.df_master_data, list(set(self.df_master_data) - {'CPM价格'}))
-            # if status != True:
-            #     return status, message
-
             status, message = self._check_fields_existence(self.df_master_data,
                                                                  ['线路中文名称','线路英文名称','站点中文名称','站点英文名称','点位编码'
                                                                   ,'点位中文名称','点位英文名称','站点等级序号','英文站点等级','中文站点等级',
                                                                   '中文点位类别','英文点位类别','是否电子媒体','CPM价格','非Admin用户可选'])
             if status != True:
                 return status, message
+            status, message = self._check_no_null_value_in_cloumns(self.df_master_data, list(set(self.df_master_data) - {'CPM价格'}))
+            if status != True:
+                return status, message
 
-            self.df_master_data = pd.merge(self.df_master_data, self.df_station_mapping,
-                                           on=['线路中文名称', '站点中文名称'])
-            self.df_master_data['站点编号'] = self.df_master_data['L版station_id']
-            self.df_master_data = self.df_master_data.drop(columns=['L版station_id'])
         return status, message
 
     # 检查主数据模板表除了CPM列 是否存在空值
@@ -86,7 +81,6 @@ class checkAdminMasterData:
             message.append({"step": "检查是否有空值",
                             "reason": '以下字段有空值：' + ','.join(columns_with_null) + '，请根据实际情况填值；\n'})
         return status, message
-
 
     # 检查主数据模板表
     # 检查线路中文名与英文名是否一一对应
@@ -285,7 +279,7 @@ class checkAdminMasterData:
         conn = psycopg2.connect(**connection_parameters)
         cur = conn.cursor()
         sql = f"""
-        SELECT distinct station_code FROM public.station_traffic
+        SELECT distinct station_id FROM public.station_traffic
         WHERE env_info_code = '{self.env_info_code}'
         """
         cur.execute(sql)
@@ -294,8 +288,8 @@ class checkAdminMasterData:
         extra_stations = file_stations - db_stations
         if len(extra_stations) != 0:
             status = False
-            message.append({"step": "检查上传文件中的站点编码是否都已存在于数据库中",
-                            "reason": "以下站点编码在现有数据库中不存在：" + ','.join(extra_stations)})
+            message.append({"step": "检查L&E站点匹配模板中的L版station_id是否都已存在于数据库中",
+                            "reason": "以下station_id在现有数据库中不存在：" + ','.join(extra_stations)})
         return status, message
 
     # 检查线路颜色标识模板
@@ -316,7 +310,7 @@ class checkAdminMasterData:
         return status, message
 
     # 跨表检查
-    # 检查“主数据模板“中的线路中文名和站点中文名组合是否与”L&E站点匹配模板“中的线路中文名和站点中文名组合一一对应
+    # 检查“主数据模板”中的线路中文名和站点中文名组合是否与“L&E站点匹配模板”中的线路中文名和站点中文名组合一一对应
     def check_combination_linecn_stationcn(self, df_master_data: pd.DataFrame, df_station_mapping):
         status = True
         message = []
@@ -330,12 +324,12 @@ class checkAdminMasterData:
             # extra_combinations_station_mapping = station_mapping_combinations - master_data_combinations
             if len(extra_combinations_master_data) != 0:
                 status = False
-                message.append({"step": "检查“主数据模板“中的线路中文名和站点中文名组合是否与”L&E站点匹配模板“中的线路中文名和站点中文名组合一一对应",
-                                "reason": "”主数据模板“中以下线路站点组合未出现在”L&E站点匹配模板“中：" + ', '.join(extra_combinations_master_data) + '；'})
+                message.append({"step": "检查“主数据模板”中的线路中文名和站点中文名组合是否与“L&E站点匹配模板”中的线路中文名和站点中文名组合一一对应",
+                                "reason": "“主数据模板”中以下线路站点组合未出现在“L&E站点匹配模板”中：" + ', '.join(extra_combinations_master_data) + '；'})
             # if len(extra_combinations_station_mapping) != 0:
             #     message.append({
             #                        "step": "检查“主数据模板“中的线路中文名和站点中文名组合是否与”L&E站点匹配模板“中的线路中文名和站点中文名组合一一对应",
-            #                        "reason": "”L&E站点匹配模板“中以下线路站点组合未出现在”主数据模板“中：" + ', '.join(
+            #                        "reason": "“L&E站点匹配模板”中以下线路站点组合未出现在“主数据模板”中：" + ', '.join(
             #                            extra_combinations_station_mapping) + '；'})
 
         return status, message
@@ -352,38 +346,26 @@ class checkAdminMasterData:
             extra_lines_line_color = lines_line_color - lines_master_data
             if len(extra_lines_master_data) != 0:
                 message.append({"step": "检查“主数据模板”中线路数和“线路颜色标识模板”中线路是否一一对应",
-                                "reason": "”主数据模板“中以下线路未出现在”线路颜色标识模板“中：" + ', '.join(
+                                "reason": "“主数据模板”中以下线路未出现在“线路颜色标识模板”中：" + ', '.join(
                                     extra_lines_master_data) + '；'})
             if len(extra_lines_line_color) != 0:
                 message.append({
                                    "step": "检查“主数据模板”中线路数和“线路颜色标识模板”中线路是否一一对应",
-                                   "reason": "”线路颜色标识模板“中以下线路未出现在”主数据模板“中：" + ', '.join(
+                                   "reason": "“线路颜色标识模板”中以下线路未出现在“主数据模板”中：" + ', '.join(
                                        extra_lines_line_color) + '；'})
         return status, message
 
     def one_key_run(self):
         result = []
         sub_status, sub_message = self.check_3_templates_existence(self.file)
-
         if sub_status != True:
             result.append({'sequence': 1,
                            'status': sub_status,
                            'message': sub_message})
             return result
-        status, message = self._check_fields_existence(self.df_master_data,
-                                                       ['线路中文名称', '线路英文名称', '站点中文名称','站点英文名称','点位编码'
-                                                        '点位中文名称', '点位英文名称', '站点等级序号','中文站点等级','英文站点等级',
-                                                        '中文点位类别','英文点位类别','是否电子媒体','CPM价格','非Admin用户可选'])
-        if status != True:
-            result.append({'sequence': 1,
-                           'status': '检查字段',
-                           'message': message})
-            return result
 
         # 检查主数据模板表
-        process_master_data = [
-            self.check_Column_notnull,
-                                self.check_linecn_lineen_mapping,
+        process_master_data = [self.check_linecn_lineen_mapping,
                                self.check_stationcode_stationname_mapping,
                                self.check_stationnamecn_stationnameen_mapping,
                                self.check_stationnamecn_stationlevelname_mapping,
@@ -432,13 +414,15 @@ class checkAdminMasterData:
         result.append({'sequence': str(sequence),
                        'status': sub_status,
                        'message': sub_message})
+        self.df_master_data = pd.merge(self.df_master_data, self.df_station_mapping,
+                                           on=['线路中文名称', '站点中文名称'])
 
         return result
 
 
 
 # if __name__ == '__main__':
-#     file_dir = r"C:\Users\zewen.liang\Downloads\MAM E版本升级需要的数据-新版20240626v2.xlsx"
+#     file_dir = r"C:\Users\zewen.liang\Downloads\MAM E版本升级需要的数据-新版20240703 2.xlsx"
 #     env_info_code = 'mam-shanghai'
 #     checker = checkAdminMasterData(file_dir, env_info_code)
 #     res = checker.one_key_run()

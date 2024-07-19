@@ -152,6 +152,8 @@ class Mam_e_master_data_generator:
 
                 cur.execute(update_asset_is_active_sql)
             conn.commit()
+        self.insert_log(cur, schema)
+        conn.commit()
         conn.close()
 
     def create_tables_in_db(self, drop_existed_table):
@@ -359,6 +361,7 @@ class Mam_e_master_data_generator:
             CONSTRAINT env_company_pkey PRIMARY KEY (id)
         );
 
+
         '''
 
         sql_impression_report_access = f'''
@@ -455,6 +458,14 @@ class Mam_e_master_data_generator:
             cur.execute(sql)
             conn.commit()
         conn.close()
+
+    def insert_log(self,cur,schema):
+        # sql = f'insert into {schema}.admin_page_logs(env_info_code,operator,module,action,created_time,) values ({self.env_info_code},)'
+        sql = f'''
+            insert into {schema}.admin_page_logs(env_info_code,operator,module,action,created_time)
+             values ('{self.env_info_code}','{self.user}','mam_e_master_data','upload_master_data',CURRENT_TIMESTAMP)
+        '''
+        cur.execute(sql)
 
     def export_excel_file(self, export_file_dir):
         with pd.ExcelWriter(export_file_dir) as writer:
